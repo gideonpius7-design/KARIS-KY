@@ -7,6 +7,45 @@ on:
     branches: [main]
 
 jobs:
+  sdk-typecheck-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Cache SDK node_modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            sdk/node_modules
+            sdk-ts/node_modules
+          key: ${{ runner.os }}-sdk-node-${{ hashFiles('sdk/package-lock.json', 'sdk-ts/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-sdk-node-
+
+      - name: Install and validate SDKs
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          for dir in sdk sdk-ts; do
+            if [ ! -d "$dir" ]; then
+              echo "Skipping missing SDK project: $dir"
+              continue
+            fi
+
+            echo "==> Validating $dir"
+            cd "$dir"
+            npm ci
+            npx tsc --noEmit
+            npm test -- --runInBand --passWithNoTests
+            cd ..
+          done
+
   fmt-build-test:
     runs-on: ubuntu-latest
     steps:
