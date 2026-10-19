@@ -317,6 +317,14 @@ export class EscrowClient {
     return this.invoke("claim_investor_payout", [investor], source);
   }
 
+  /** Record payout claims for multiple investors. Auth: per-investor. */
+  async batchClaimInvestorPayouts(investors: string[], source?: string): Promise<number> {
+    if (investors.length === 0) {
+      throw new Error("investors must not be empty");
+    }
+    return this.invoke("batch_claim_investor_payouts", [investors], source);
+  }
+
   /** Cancel funding. Auth: admin. */
   async cancelFunding(source?: string): Promise<InvoiceEscrow> {
     return this.invoke("cancel_funding", [], source);
