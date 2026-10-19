@@ -35,10 +35,13 @@ Operations that are **not** gated (read-only or metadata-only):
 ## Enforcement model
 
 ```
-set_legal_hold(active: bool)
+set_legal_hold(active: bool, reason: String)
     └─ escrow.admin.require_auth()   ← Soroban auth check, cannot be spoofed
+    └─ if active: validate reason.len() > 0 and ≤ 256 bytes
     └─ storage().instance().set(DataKey::LegalHold, active)
-    └─ emits LegalHoldChanged { active: 1 | 0 }
+    └─ storage().instance().set(DataKey::LegalHoldReason, reason)  (if active and reason.len() > 0)
+    └─ emits LegalHoldChanged { active: 1 | 0, reason: String }
+    └─ emits LegalHoldSet { active: 1 | 0, timestamp, actor }
 
 request_clear_legal_hold()
     └─ escrow.admin.require_auth()
@@ -46,8 +49,15 @@ request_clear_legal_hold()
     └─ emits LegalHoldClearRequested { clearable_at }
 
 clear_legal_hold()
-    └─ delegates to set_legal_hold(false)   ← same auth path, no shortcut
+    └─ delegates to set_legal_hold(false, "")   ← same auth path, no shortcut
 ```
+
+**Reason parameter semantics:**
+
+- **When activating** (`active=true`): `reason` must be a non-empty, human-readable description (max 256 bytes) explaining why the hold was set (e.g., "Regulatory investigation", "Court order compliance check").
+- **When deactivating** (`active=false`): `reason` can be empty; the stored reason is cleared from storage.
+- **Storage:** The reason is stored under `DataKey::LegalHoldReason` only when the hold is active and the reason is non-empty. When the hold is cleared, the reason is removed.
+- **Auditability:** Both `LegalHoldChanged` and `LegalHoldSet` events include the reason for off-chain compliance logging.
 
 Key properties:
 

@@ -57,3 +57,59 @@ test("fails clearly when getEvents is unavailable", async () => {
   const client = new EscrowClient({ rpcUrl: "http://localhost", networkPassphrase: "test" }, rpc);
   await expect(client.subscribeEscrowEvents().next()).rejects.toThrow("does not support getEvents");
 });
+
+test("setLegalHold passes both active and reason arguments", async () => {
+  const mockInvoke = jest.fn().mockResolvedValue(undefined);
+  const rpc: SorobanRpcClient = {
+    invoke: mockInvoke,
+    simulate: jest.fn(),
+    getLedger: jest.fn(),
+  };
+  const client = new EscrowClient({ rpcUrl: "http://localhost", networkPassphrase: "test" }, rpc);
+  client.setContractId("CTEST123");
+
+  // Test activating legal hold with reason
+  await client.setLegalHold(true, "Compliance investigation", "source123");
+  expect(mockInvoke).toHaveBeenCalledWith(
+    "CTEST123",
+    "set_legal_hold",
+    [true, "Compliance investigation"],
+    "source123"
+  );
+
+  // Test deactivating legal hold with empty reason
+  mockInvoke.mockClear();
+  await client.setLegalHold(false, "", "source456");
+  expect(mockInvoke).toHaveBeenCalledWith(
+    "CTEST123",
+    "set_legal_hold",
+    [false, ""],
+    "source456"
+  );
+});
+
+test("setLegalHold rejects empty reason when active=true", async () => {
+  const rpc: SorobanRpcClient = {
+    invoke: jest.fn(),
+    simulate: jest.fn(),
+    getLedger: jest.fn(),
+  };
+  const client = new EscrowClient({ rpcUrl: "http://localhost", networkPassphrase: "test" }, rpc);
+
+  // Should throw when activating with empty reason
+  await expect(client.setLegalHold(true, "")).rejects.toThrow(
+    "reason must be non-empty when legal hold is activated"
+  );
+
+  // Should throw when activating with whitespace-only reason
+  await expect(client.setLegalHold(true, "   ")).rejects.toThrow(
+    "reason must be non-empty when legal hold is activated"
+  );
+
+  // Should not throw when deactivating with empty reason
+  const mockInvoke = jest.fn().mockResolvedValue(undefined);
+  rpc.invoke = mockInvoke;
+  client.setContractId("CTEST123");
+  await client.setLegalHold(false, "");
+  expect(mockInvoke).toHaveBeenCalled();
+});

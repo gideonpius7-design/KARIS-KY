@@ -185,7 +185,7 @@ cargo clippy --all-targets -- -D warnings
 | `claim_investor_payout` | Investor records a payout claim after settlement. |
 | `sweep_terminal_dust` | Treasury sweeps rounding residue from a terminal escrow. |
 | `migrate` | Schema version gate — **typed errors on all paths** in the current release (codes 90–92). |
-| `set_legal_hold` | Admin activates/clears compliance hold. |
+| `set_legal_hold` | Admin activates/clears compliance hold with reason (max 256 bytes; required when activating). |
 | `pause_dispute` | Admin temporarily freezes escrow due to dispute (separate from legal hold). |
 | `resume_dispute` | Admin manually resumes a paused escrow (or wait for auto-expiration). |
 | `is_dispute_paused` | Check if dispute pause is currently active. |
