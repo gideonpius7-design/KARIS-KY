@@ -597,8 +597,11 @@ export class EscrowClient {
   }
 
   /** Set or clear legal hold. Auth: admin. */
-  async setLegalHold(active: boolean, source?: string): Promise<void> {
-    return this.invoke("set_legal_hold", [active], source);
+  async setLegalHold(active: boolean, reason: string, source?: string): Promise<void> {
+    if (active && reason.trim().length === 0) {
+      throw new Error("reason must be non-empty when legal hold is activated (active=true)");
+    }
+    return this.invoke("set_legal_hold", [active, reason], source);
   }
 
   /** Propose a legal hold for guardian confirmation. Auth: current admin. */

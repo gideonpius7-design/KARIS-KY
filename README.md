@@ -61,7 +61,33 @@ truth; everything else is a client of it.
    environment sourced, use the Stellar CLI to call the deployed contract, e.g.
    `stellar contract invoke --id $CONTRACT_ID -- <entrypoint> ...`.
 
-4. **Build the TypeScript SDK** —
+## Escrow contract — public entrypoints
+
+| Entrypoint | Description |
+|------------|-------------|
+| `init` | Create an invoice escrow; binds funding token, treasury, optional registry. See [parameter reference](docs/escrow-init-parameters.md). |
+| `fund` | Record investor principal; marks escrow funded when target is met. See [fund parameters reference](docs/escrow-fund-parameters.md). |
+| `fund_with_commitment` | First deposit with optional lock period; selects tiered yield. See [fund parameters reference](docs/escrow-fund-parameters.md). |
+| `settle` | Mark a funded escrow as settled (SME auth required; maturity enforced). |
+| `clone_settled_escrow` | Clone a settled escrow template to create a new independent escrow with the same parameters (admin auth required). |
+| `withdraw` | SME pulls funded liquidity (accounting record). |
+| `claim_investor_payout` | Investor records a payout claim after settlement. |
+| `sweep_terminal_dust` | Treasury sweeps rounding residue from a terminal escrow. |
+| `migrate` | Schema version gate — **typed errors on all paths** in the current release (codes 90–92). |
+| `set_legal_hold` | Admin activates/clears compliance hold with reason (max 256 bytes; required when activating). |
+| `pause_dispute` | Admin temporarily freezes escrow due to dispute (separate from legal hold). |
+| `resume_dispute` | Admin manually resumes a paused escrow (or wait for auto-expiration). |
+| `is_dispute_paused` | Check if dispute pause is currently active. |
+| `get_dispute_pause` | Retrieve active dispute pause state (ticket, timestamps). |
+| `bind_primary_attestation_hash` | Admin sets a single-write 32-byte digest. |
+| `append_attestation_digest` | Admin appends to bounded audit log. |
+| `record_sme_collateral_commitment` | SME records collateral pledge (metadata only). |
+| `get_escrow` | Read current escrow state. |
+| `get_version` | Read stored `DataKey::Version`. |
+| `check_escrow_health` | Read-only health check: returns `(warning_type, funded_ratio_bps, time_to_maturity_secs)` for risk monitoring. |
+| `get_escrow_health` | Formatted health summary with warning label, percentage, and recommendations. |
+| `export_state` | Admin serializes all enumerable instance-storage state into an `EscrowSnapshot` (disaster recovery / migration). |
+| `import_state` | Admin restores instance-storage state from an `EscrowSnapshot` onto a fresh, uninitialized instance. |
 
    ```bash
    cd sdk-ts
