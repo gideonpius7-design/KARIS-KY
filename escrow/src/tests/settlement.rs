@@ -2604,3 +2604,19 @@ fn reinvest_yield_rejects_non_positive_amount() {
 
     source_client.reinvest_yield(&investor, &target_client.address, &0i128);
 }
+
+#[test]
+fn reinvest_yield_rejects_self_target() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (source_client, admin, sme) = setup(&env);
+    default_init(&source_client, &env, &admin, &sme);
+
+    let investor = Address::generate(&env);
+    source_client.fund(&investor, &TARGET);
+    source_client.settle();
+
+    // Attempt to reinvest yield back into the same (source) escrow
+    let result = source_client.try_reinvest_yield(&investor, &source_client.address, &1_000i128);
+    assert_contract_error(result, crate::EscrowError::ReinvestSelfTargetRejected);
+}

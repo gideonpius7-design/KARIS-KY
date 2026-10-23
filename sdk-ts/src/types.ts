@@ -145,6 +145,18 @@ export interface InvestorPosition {
   yield_claim_delegate: string | null;
 }
 
+/** One checkpoint entry in an investor's funding history. */
+export interface InvestorFundingRecord {
+  /** Kind of checkpoint: "deposit", "funding_close", or "settlement". */
+  checkpoint: string;
+  /** Ledger timestamp when this checkpoint was recorded. */
+  timestamp: string;
+  /** Amount associated with this checkpoint (deposit amount or payout at settlement). */
+  amount: string;
+  /** Investor's cumulative principal contribution as of this checkpoint. */
+  cumulative_total: string;
+}
+
 /** Snapshot payload returned by `export_state` and accepted by `import_state`. */
 export interface EscrowSnapshot {
   escrow: InvoiceEscrow;
@@ -169,6 +181,14 @@ export interface EscrowSnapshot {
   funding_deadline: string | null;
   pending_admin: string | null;
   checksum: string;
+}
+
+/** Investor capacity snapshot returned by `get_investor_cap_status`. */
+export interface InvestorCapStatus {
+  max: number;
+  current: number;
+  remaining: number;
+  is_full: boolean;
 }
 
 /** Structured error diagnostic emitted alongside contract errors. */
@@ -246,6 +266,8 @@ export const MAX_INVOICE_ID_STRING_LEN = 32;
 export const MAX_ATTESTATION_APPEND_ENTRIES = 32;
 export const MAX_INVESTOR_ALLOWLIST_BATCH = 32;
 export const MAX_FUND_BATCH = 50;
+export const MAX_INVESTOR_HISTORY_ENTRIES = 128;
+export const MAX_HISTORY_PAGE_SIZE = 50;
 export const MAX_DUST_SWEEP_AMOUNT = "100000000";
 
 // ---------------------------------------------------------------------------

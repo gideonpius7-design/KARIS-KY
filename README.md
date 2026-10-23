@@ -4,6 +4,9 @@ Soroban smart contracts for karis-ky, the invoice liquidity network on Stellar.
 This repository contains the `escrow` contract that holds investor funds for
 tokenized invoices until settlement and is maintained under the `karis-ky` project name.
 
+> **Security:** To report a vulnerability, please follow our [security policy](SECURITY.md).
+> Do not open public issues for security reports.
+
 ---
 
 ## Getting started (full stack)
@@ -58,7 +61,33 @@ truth; everything else is a client of it.
    environment sourced, use the Stellar CLI to call the deployed contract, e.g.
    `stellar contract invoke --id $CONTRACT_ID -- <entrypoint> ...`.
 
-4. **Build the TypeScript SDK** —
+## Escrow contract — public entrypoints
+
+| Entrypoint | Description |
+|------------|-------------|
+| `init` | Create an invoice escrow; binds funding token, treasury, optional registry. See [parameter reference](docs/escrow-init-parameters.md). |
+| `fund` | Record investor principal; marks escrow funded when target is met. See [fund parameters reference](docs/escrow-fund-parameters.md). |
+| `fund_with_commitment` | First deposit with optional lock period; selects tiered yield. See [fund parameters reference](docs/escrow-fund-parameters.md). |
+| `settle` | Mark a funded escrow as settled (SME auth required; maturity enforced). |
+| `clone_settled_escrow` | Clone a settled escrow template to create a new independent escrow with the same parameters (admin auth required). |
+| `withdraw` | SME pulls funded liquidity (accounting record). |
+| `claim_investor_payout` | Investor records a payout claim after settlement. |
+| `sweep_terminal_dust` | Treasury sweeps rounding residue from a terminal escrow. |
+| `migrate` | Schema version gate — **typed errors on all paths** in the current release (codes 90–92). |
+| `set_legal_hold` | Admin activates/clears compliance hold with reason (max 256 bytes; required when activating). |
+| `pause_dispute` | Admin temporarily freezes escrow due to dispute (separate from legal hold). |
+| `resume_dispute` | Admin manually resumes a paused escrow (or wait for auto-expiration). |
+| `is_dispute_paused` | Check if dispute pause is currently active. |
+| `get_dispute_pause` | Retrieve active dispute pause state (ticket, timestamps). |
+| `bind_primary_attestation_hash` | Admin sets a single-write 32-byte digest. |
+| `append_attestation_digest` | Admin appends to bounded audit log. |
+| `record_sme_collateral_commitment` | SME records collateral pledge (metadata only). |
+| `get_escrow` | Read current escrow state. |
+| `get_version` | Read stored `DataKey::Version`. |
+| `check_escrow_health` | Read-only health check: returns `(warning_type, funded_ratio_bps, time_to_maturity_secs)` for risk monitoring. |
+| `get_escrow_health` | Formatted health summary with warning label, percentage, and recommendations. |
+| `export_state` | Admin serializes all enumerable instance-storage state into an `EscrowSnapshot` (disaster recovery / migration). |
+| `import_state` | Admin restores instance-storage state from an `EscrowSnapshot` onto a fresh, uninitialized instance. |
 
    ```bash
    cd sdk-ts
@@ -169,61 +198,6 @@ See [`sdk-ts/`](sdk-ts/) for the typed client wrapper, contract types, and examp
 ## Schema version changelog (`DataKey::Version`)
 
 The `SCHEMA_VERSION` constant in `escrow/src/lib.rs` is stored on-chain under
-`DataKey::Version` at [`init`] and is the authoritative version for upgrade
-decisions. All production instances should have this value match the deployed
-WASM.
+`DataKey::Version` at [`init`] and is the
 
-| Version | Description | Upgrade path |
-|---------|-------------|--------------|
-| 1 | Initial schema (`InvoiceEscrow` v1, basic funding / settle) | N/A |
-| 2 | Added per-investor yield keys (`InvestorEffectiveYield`, `InvestorClaimNotBefore`) | Additive keys — no `migrate` call required for read compatibility |
-| 3 | Added `FundingCloseSnapshot`, `MinContributionFloor`, `MaxUniqueInvestorsCap`, `UniqueFunderCount` | Additive keys — old instances return `None` / `0` defaults |
-| 4 | Added attestation API (`PrimaryAttestationHash`, `AttestationAppendLog`) | Additive keys — no `migrate` call required |
-| 5 | Added `YieldTierTable` (`fund_with_commitment`), `RegistryRef`, `Treasury`; tightened `InvoiceEscrow` layout | **Redeploy required** if `InvoiceEscrow` struct layout differs from stored XDR |
-| 6 | Moved per-investor keys to persistent storage to bound instance footprint and decouple per-address TTL | **Redeploy required** — prior instances must be redeployed to pick up new storage locations |
-| 7 | Added `DisputePaused` state for temporary dispute resolution (separate from legal hold) | Additive keys — no `migrate` call required |
-
-> **Current:** `SCHEMA_VERSION = 8`
-
----
-
-## Storage-only upgrade policy (additive fields)
-
-**Compatible without redeploy** when you only:
-
-- Add **new** `DataKey` variants and/or new `#[contracttype]` structs stored
-  under **new** keys.
-- Read new keys with `.get(...).unwrap_or(default)` so missing keys behave as
-  "unset" on old deployments.
-
-**Requires new deployment or explicit migration** when you:
-
-- Change the layout or XDR shape of an existing stored type (e.g. add a
-  required field to `InvoiceEscrow` without a migration that rewrites
-  `DataKey::Escrow`).
-- Rename or change the XDR shape of an existing `DataKey` variant used in
-  production.
-
-### `migrate` entrypoint — typed error semantics
-
-`LiquifactEscrow::migrate(from_version)` emits typed [`EscrowError`](docs/escrow-error-messages.md)
-codes in all current cases. There is **no silent migration path** from any prior version to
-version 6. Callers must not assume it will do bookkeeping work:
-
-| Condition | Typed error (code) |
-|-----------|-------------------|
-| `stored != from_version` | `MigrationVersionMismatch` (90) |
-| `from_version >= SCHEMA_VERSION` | `AlreadyCurrentSchemaVersion` (91) |
-| Any `from_version < SCHEMA_VERSION` | `NoMigrationPath` (92) |
-
-See [`docs/escrow-error-messages.md`](docs/escrow-error-messages.md) for the full reference.
-
-To add a real migration path (e.g. rewrite `DataKey::Escrow` after a struct
-field change), implement the transformation inside `migrate` before the final
-typed error and update `DataKey::Version`.
-
-### `DataKey` naming convention
-
-| Rule | Example |
-|------|---------|
-| PascalCa
+/* … truncated 2889 chars — edit only what you need near the top … */

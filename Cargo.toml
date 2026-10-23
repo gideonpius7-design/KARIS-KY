@@ -2,6 +2,9 @@
 members = ["escrow", "repl-cli"]
 resolver = "2"
 
+[workspace.package]
+license = "MIT"
+
 [workspace.metadata.cargo-llvm-cov]
 # Exclude test scaffolding from coverage measurement — only production code is gated.
 exclude = [
