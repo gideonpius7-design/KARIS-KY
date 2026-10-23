@@ -54,6 +54,7 @@ mod external_calls;
 mod external_calls_mocked;
 mod funding;
 mod health_and_events;
+mod history_pagination;
 mod init;
 mod integration;
 mod legal_hold;

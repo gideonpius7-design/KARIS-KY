@@ -122,25 +122,167 @@ use soroban_sdk::{
     symbol_short, token::TokenClient, Address, Bytes, BytesN, Env, Executable, String, Symbol, Vec,
 };
 
-mod admin;
-mod attestations;
-mod constants;
-mod contract;
-mod errors;
-mod events;
-mod funding;
-mod legal_hold;
-mod settlement;
-mod storage;
-mod types;
-pub use constants::*;
-pub use contract::*;
-pub use errors::EscrowError;
-pub(crate) use errors::{ensure, fail};
-pub use events::*;
-pub use storage::DataKey;
-pub(crate) use storage::{PerInvestorStorage, PerInvestorStorageExt};
-pub use types::*;
+struct PerInvestorStorage<'a> {
+    env: &'a Env,
+}
+
+impl<'a> PerInvestorStorage<'a> {
+    fn new(env: &'a Env) -> Self {
+        Self { env }
+    }
+
+    fn get_contribution(&self, investor: Address) -> i128 {
+        self.env
+            .storage()
+            .persistent()
+            .get(&DataKey::InvestorContribution(investor))
+            .unwrap_or(0)
+    }
+
+    fn set_contribution(&self, investor: Address, amount: i128) {
+        self.env
+            .storage()
+            .persistent()
+            .set(&DataKey::InvestorContribution(investor), &amount);
+    }
+
+    fn get_effective_yield(&self, investor: Address) -> Option<i64> {
+        self.env
+            .storage()
+            .persistent()
+            .get(&DataKey::InvestorEffectiveYield(investor))
+    }
+
+    fn set_effective_yield(&self, investor: Address, value: i64) {
+        self.env
+            .storage()
+            .persistent()
+            .set(&DataKey::InvestorEffectiveYield(investor), &value);
+    }
+
+    fn get_claim_not_before(&self, investor: Address) -> u64 {
+        self.env
+            .storage()
+            .persistent()
+            .get(&DataKey::InvestorClaimNotBefore(investor))
+            .unwrap_or(0)
+    }
+
+    fn set_claim_not_before(&self, investor: Address, value: u64) {
+        self.env
+            .storage()
+            .persistent()
+            .set(&DataKey::InvestorClaimNotBefore(investor), &value);
+    }
+
+    fn get_lock_in_until(&self, investor: Address) -> u64 {
+        self.env
+            .storage()
+            .persistent()
+            .get(&DataKey::InvestorLockInUntil(investor))
+            .unwrap_or(0)
+    }
+
+    fn set_lock_in_until(&self, investor: Address, value: u64) {
+        self.env
+            .storage()
+            .persistent()
+            .set(&DataKey::InvestorLockInUntil(investor), &value);
+    }
+
+    fn get_claimed(&self, investor: Address) -> bool {
+        self.env
+            .storage()
+            .persistent()
+            .get(&DataKey::InvestorClaimed(investor))
+            .unwrap_or(false)
+    }
+
+    fn set_claimed(&self, investor: Address, value: bool) {
+        self.env
+            .storage()
+            .persistent()
+            .set(&DataKey::InvestorClaimed(investor), &value);
+    }
+
+    fn get_allowlisted(&self, investor: Address) -> bool {
+        self.env
+            .storage()
+            .persistent()
+            .get(&DataKey::InvestorAllowlisted(investor))
+            .unwrap_or(false)
+    }
+
+    fn set_allowlisted(&self, investor: Address, allowed: bool) {
+        self.env
+            .storage()
+            .persistent()
+            .set(&DataKey::InvestorAllowlisted(investor), &allowed);
+    }
+
+    fn get_yield_claim_delegate(&self, investor: Address) -> Option<Address> {
+        self.env
+            .storage()
+            .persistent()
+            .get(&DataKey::YieldClaimDelegate(investor))
+    }
+
+    fn set_yield_claim_delegate(&self, investor: Address, delegate: Address) {
+        self.env
+            .storage()
+            .persistent()
+            .set(&DataKey::YieldClaimDelegate(investor), &delegate);
+    }
+
+    fn get_yield_claim_delegate_revoked(&self, investor: Address) -> bool {
+        self.env
+            .storage()
+            .persistent()
+            .get(&DataKey::YieldClaimDelegateRevoked(investor))
+            .unwrap_or(false)
+    }
+
+    fn set_yield_claim_delegate_revoked(&self, investor: Address, revoked: bool) {
+        self.env
+            .storage()
+            .persistent()
+            .set(&DataKey::YieldClaimDelegateRevoked(investor), &revoked);
+    }
+
+    fn get_funding_history(&self, investor: Address) -> Vec<InvestorFundingRecord> {
+        self.env
+            .storage()
+            .persistent()
+            .get(&DataKey::InvestorFundingHistory(investor))
+            .unwrap_or_else(|| Vec::new(self.env))
+    }
+
+    fn set_funding_history(&self, investor: Address, history: Vec<InvestorFundingRecord>) {
+        self.env
+            .storage()
+            .persistent()
+            .set(&DataKey::InvestorFundingHistory(investor), &history);
+    }
+
+    fn append_funding_record(&self, investor: Address, record: InvestorFundingRecord) {
+        let mut history = self.get_funding_history(investor.clone());
+        if (history.len() as u32) < MAX_INVESTOR_HISTORY_ENTRIES {
+            history.push_back(record);
+            self.set_funding_history(investor, history);
+        }
+        // If history is at max capacity, silently drop the new record (existing history preserved)
+    }
+}
+
+trait PerInvestorStorageExt {
+    fn per_investor(&self) -> PerInvestorStorage;
+}
+
+impl PerInvestorStorageExt for Env {
+    fn per_investor(&self) -> PerInvestorStorage {
+        PerInvestorStorage::new(self)
+    }
+}
 
 pub mod external_calls;
 pub mod validation;
@@ -189,6 +331,10 @@ pub const MAX_REINVESTMENT_AUDIT_ENTRIES: u32 = 100;
 /// per-address persistent storage bounded. Once reached, further checkpoints are not
 /// appended (existing history is preserved; see [`LiquifactEscrow::get_investor_history`]).
 pub const MAX_INVESTOR_HISTORY_ENTRIES: u32 = 128;
+
+/// Maximum page size for paginated history queries via [`LiquifactEscrow::get_investor_history_page`].
+/// Limits CPU and memory usage per paginated read. Must be <= [`MAX_INVESTOR_HISTORY_ENTRIES`].
+pub const MAX_HISTORY_PAGE_SIZE: u32 = 50;
 
 /// Upper bound on [`DataKey::AdminRoles`] entries to keep instance storage/CPU bounded.
 pub const MAX_ADMIN_ROLES: u32 = 16;
@@ -656,6 +802,11 @@ pub enum DataKey {
     /// Minimum [`Env::ledger`] timestamp before [`LiquifactEscrow::claim_investor_payout`] (0 = no extra gate).
     /// **Persistent** storage. Absent ⇒ `0`. One entry per investor address; set on first deposit.
     InvestorClaimNotBefore(Address),
+    /// Append-only funding checkpoint history for each investor.
+    /// **Persistent** storage. Records deposits, funding close events, and settlement claims.
+    /// Bounded by [`MAX_INVESTOR_HISTORY_ENTRIES`] per investor address.
+    /// Absent ⇒ empty (investor has never funded). One entry per investor address.
+    InvestorFundingHistory(Address),
     /// Minimum [`LiquifactEscrow::fund`] / [`LiquifactEscrow::fund_with_commitment`] amount per call (0 = no floor).
     /// Written as `0` even when unconfigured so reads always succeed.
     MinContributionFloor,
@@ -3051,6 +3202,14 @@ impl LiquifactEscrow {
         env.per_investor().set_yield_claim_delegate_revoked(investor, revoked);
     }
 
+    fn get_persistent_investor_history(env: &Env, investor: Address) -> Vec<InvestorFundingRecord> {
+        env.per_investor().get_funding_history(investor)
+    }
+
+    fn append_persistent_funding_record(env: &Env, investor: Address, record: InvestorFundingRecord) {
+        env.per_investor().append_funding_record(investor, record);
+    }
+
     /// Verify that a delegation is valid (exists and is not revoked).
     /// Returns `true` if a valid delegation exists; `false` if no delegation or revoked.
     fn delegation_is_valid(env: &Env, investor: Address) -> bool {
@@ -3082,6 +3241,60 @@ impl LiquifactEscrow {
     /// [`MAX_INVESTOR_HISTORY_ENTRIES`]; returns an empty vector if `investor` never funded.
     pub fn get_investor_history(env: Env, investor: Address) -> Vec<InvestorFundingRecord> {
         Self::get_persistent_investor_history(&env, investor)
+    }
+
+    /// Returns a paginated slice of `investor`'s funding checkpoint history.
+    ///
+    /// # Parameters
+    ///
+    /// * `investor` - The investor address to fetch history for.
+    /// * `offset` - Zero-indexed starting position in the history. Offsets beyond the history
+    ///   length return an empty vector.
+    /// * `limit` - Maximum number of records to return. Capped at [`MAX_HISTORY_PAGE_SIZE`]
+    ///   to prevent excessive CPU/memory usage.
+    ///
+    /// # Returns
+    ///
+    /// A `Vec` of up to `min(limit, MAX_HISTORY_PAGE_SIZE)` records, or fewer if the offset
+    /// is near the end of the history or the investor has no history. An empty vector is
+    /// returned if `investor` never funded or `offset >= history.len()`.
+    ///
+    /// # Pagination Example
+    ///
+    /// ```ignore
+    /// let history = get_investor_history_page(env, investor, 0, 50);
+    /// let next_page = get_investor_history_page(env, investor, 50, 50);
+    /// ```
+    pub fn get_investor_history_page(
+        env: Env,
+        investor: Address,
+        offset: u32,
+        limit: u32,
+    ) -> Vec<InvestorFundingRecord> {
+        let history = Self::get_persistent_investor_history(&env, investor);
+        let history_len = history.len() as u32;
+
+        // Handle offset beyond history
+        if offset >= history_len {
+            return Vec::new(&env);
+        }
+
+        // Cap limit to MAX_HISTORY_PAGE_SIZE
+        let capped_limit = if limit > MAX_HISTORY_PAGE_SIZE {
+            MAX_HISTORY_PAGE_SIZE
+        } else {
+            limit
+        };
+
+        // Calculate the end index, capping at history length
+        let end_idx = std::cmp::min(offset + capped_limit, history_len);
+
+        // Extract the slice from offset to end_idx
+        let mut result = Vec::new(&env);
+        for i in offset..end_idx {
+            result.push_back(history.get_unchecked(i as usize));
+        }
+        result
     }
 
     /// Pro-rata denominator captured when the escrow first became **funded**; [`None`] until then.

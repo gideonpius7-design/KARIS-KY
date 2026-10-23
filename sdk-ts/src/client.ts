@@ -19,6 +19,7 @@ import {
   type EscrowSummary,
   type InvestorCapStatus,
   type InvestorPosition,
+  type InvestorFundingRecord,
   type EscrowSnapshot,
   type ErrorDiagnostic,
   type EscrowTemplate,
@@ -338,6 +339,18 @@ export class EscrowClient {
 
   async isInvestorRefunded(investor: string): Promise<boolean> {
     return this.simulate("is_investor_refunded", [investor]);
+  }
+
+  async getInvestorHistory(investor: string): Promise<InvestorFundingRecord[]> {
+    return this.simulate("get_investor_history", [investor]);
+  }
+
+  async getInvestorHistoryPage(
+    investor: string,
+    offset: number,
+    limit: number,
+  ): Promise<InvestorFundingRecord[]> {
+    return this.simulate("get_investor_history_page", [investor, offset, limit]);
   }
 
   async getMinContributionFloor(): Promise<string> {
