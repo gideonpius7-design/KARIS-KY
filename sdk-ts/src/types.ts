@@ -311,15 +311,16 @@ export enum EscrowErrorCode {
   RecipientBalanceDeltaMismatch = 41,
   SweepExceedsLiabilityFloor = 42,
 
-  // Attestation (50–53)
+  // Attestation (50–52)
   PrimaryAttestationAlreadyBound = 50,
   AttestationAppendLogCapacityReached = 51,
-  AttestationHashAlreadyBound = 53,
+  InvalidAttestationHashLength = 52,
 
-  // SME collateral (60–62)
+  // SME collateral (60–63)
   CollateralAmountNotPositive = 60,
   CollateralAssetEmpty = 61,
   CollateralTimestampBackwards = 62,
+  CollateralUpdateAfterSettlement = 63,
 
   // Admin validation (70–83)
   InvestorBatchEmpty = 70,
@@ -388,11 +389,11 @@ export enum EscrowErrorCode {
   // Beneficiary rotation + admin handover + funding deadline (160–164)
   LegalHoldBlocksBeneficiaryRotation = 160,
   RotationNotOpen = 161,
-  YieldSlippageDetected = 162,
-  YieldSlippageThresholdOutOfRange = 163,
-  FundingDeadlinePassed = 164,
+  NewSmeSameAsCurrent = 162,
+  NoPendingAdmin = 163,
+  InsufficientContractBalance = 164,
 
-  // Dispute pause (165–172)
+  // Dispute pause + governance / role checks (165–180)
   DisputePausedBlocksFunding = 165,
   DisputePausedBlocksSettlement = 166,
   DisputePausedBlocksWithdrawal = 167,
@@ -401,8 +402,6 @@ export enum EscrowErrorCode {
   DisputeTicketIdEmpty = 170,
   NoPauseActive = 171,
   LedgerTimestampOverflow = 172,
-
-  // KYC + admin roles + multisig (173–180)
   InvestorNotVerified = 173,
   InsufficientAdminRole = 174,
   InvalidAdminRoleList = 175,
@@ -411,11 +410,6 @@ export enum EscrowErrorCode {
   MultisigOperationsListEmpty = 178,
   MultisigInsufficientSigners = 179,
   MultisigSignerNotAuthorized = 180,
-
-  // Admin handover + contract balance (181–183)
-  NewSmeSameAsCurrent = 181,
-  NoPendingAdmin = 182,
-  InsufficientContractBalance = 183,
 }
 
 /** Human-readable error descriptions keyed by error code. */
@@ -451,9 +445,11 @@ export const ESCROW_ERROR_LABELS: Record<number, string> = {
   42: "Sweep would exceed liability floor",
   50: "Primary attestation already bound",
   51: "Attestation append log capacity reached",
+  52: "Attestation hash must be exactly 32 bytes",
   60: "Collateral amount must be positive",
   61: "Collateral asset symbol must not be empty",
   62: "Collateral timestamp must not go backward",
+  63: "Collateral updates are blocked after settlement",
   70: "Investor batch must be non-empty",
   71: "Investor batch too large",
   72: "Target must be strictly positive",
@@ -508,28 +504,25 @@ export const ESCROW_ERROR_LABELS: Record<number, string> = {
   213: "Legal-hold guardian must differ from admin",
   160: "Legal hold blocks beneficiary rotation",
   161: "Beneficiary rotation not permitted in current state",
-  162: "Yield slippage detected",
-  163: "Yield slippage threshold out of range",
-  164: "Funding deadline has passed",
-  165: "Dispute pause blocks funding",
+  162: "New SME must differ from current beneficiary",
+  163: "No pending admin",
+  164: "Contract funding token balance is below funded amount",
+  165: "Dispute pause blocks new funding",
   166: "Dispute pause blocks settlement",
   167: "Dispute pause blocks withdrawal",
   168: "Dispute pause blocks investor claims",
   169: "Dispute pause duration must be positive",
   170: "Dispute ticket ID must not be empty",
-  171: "No dispute pause active",
+  171: "No dispute pause is active",
   172: "Ledger timestamp overflow",
-  173: "Investor not verified by KYC provider",
-  174: "Insufficient admin role",
-  175: "Invalid admin role list",
-  176: "Multisig threshold invalid",
-  177: "Multisig signer list invalid",
-  178: "Multisig operations list empty",
-  179: "Multisig insufficient signers",
-  180: "Multisig signer not authorized",
-  181: "New SME must differ from current beneficiary",
-  182: "No pending admin",
-  183: "Insufficient contract balance",
+  173: "Investor is not verified by the KYC provider",
+  174: "Caller does not have the required admin role",
+  175: "Admin role list is empty, oversized, or contains duplicates",
+  176: "Multisig threshold is invalid",
+  177: "Multisig signer list is invalid",
+  178: "Multisig operations list must not be empty",
+  179: "Multisig signers do not meet the threshold",
+  180: "Signer is not authorized for this multisig policy",
 };
 
 /** Category groupings for error codes to help SDK consumers branch on categories. */
@@ -545,10 +538,10 @@ export const ESCROW_ERROR_CATEGORIES: Record<string, { range: [number, number]; 
   settlement: { range: [120, 129], label: "Settlement / payout failure" },
   cancelRefund: { range: [140, 143], label: "Cancel / refund failure" },
   legalHoldClear: { range: [150, 152], label: "Legal hold clear workflow failure" },
-  beneficiary: { range: [160, 164], label: "Beneficiary / yield / deadline failure" },
-  disputePause: { range: [165, 172], label: "Dispute pause / timestamp failure" },
-  kycRolesMultisig: { range: [173, 180], label: "KYC / admin role / multisig failure" },
-  adminHandover: { range: [181, 183], label: "Admin handover / contract balance failure" },
+  legalHoldActivation: { range: [207, 213], label: "Legal hold activation failure" },
+  beneficiary: { range: [160, 164], label: "Beneficiary / admin / deadline failure" },
+  dispute: { range: [165, 172], label: "Dispute pause / ledger safety failure" },
+  governance: { range: [173, 180], label: "KYC / role / multisig governance failure" },
 };
 
 /**
