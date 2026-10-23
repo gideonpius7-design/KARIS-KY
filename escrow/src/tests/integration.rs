@@ -84,7 +84,10 @@ fn test_register_with_registry_calls_registration_function() {
     assert!(client.register_with_registry());
     let invoice_id = client.get_escrow().invoice_id;
     let registry_client = RegistryIntegrationMockClient::new(&env, &registry);
-    assert_eq!(registry_client.get_escrow(&invoice_id), Some(client.address.clone()));
+    assert_eq!(
+        registry_client.get_escrow(&invoice_id),
+        Some(client.address.clone())
+    );
 }
 
 #[test]
@@ -616,7 +619,10 @@ fn test_collateral_record_is_metadata_only_and_does_not_invoke_token_contract() 
     );
     assert_eq!(commitment.asset, symbol_short!("USDC"));
     assert_eq!(commitment.amount, 5_000i128);
-    assert_eq!(commitment.collateral_type, soroban_sdk::String::from_str(&env, "equipment"));
+    assert_eq!(
+        commitment.collateral_type,
+        soroban_sdk::String::from_str(&env, "equipment")
+    );
     assert!(client.get_sme_collateral_commitment().is_some());
 }
 
@@ -635,6 +641,7 @@ fn test_collateral_record_event_payload_is_metadata_only() {
             &InvoiceEscrow {
                 invoice_id: invoice_id.clone(),
                 admin,
+                guardian: None,
                 sme_address: sme,
                 amount: 10_000i128,
                 funding_target: 10_000i128,
@@ -692,6 +699,7 @@ fn test_collateral_replacement_event_contains_prior_amount() {
             &InvoiceEscrow {
                 invoice_id: invoice_id.clone(),
                 admin,
+                guardian: None,
                 sme_address: sme,
                 amount: 10_000i128,
                 funding_target: 10_000i128,
@@ -1205,7 +1213,10 @@ fn withdraw_event_includes_recipient() {
 // ============================================================================
 
 /// Helper: Create a token with specified decimals
-fn setup_token_with_decimals(env: &Env, decimals: u32) -> (Address, StellarAssetClient, TokenClient) {
+fn setup_token_with_decimals(
+    env: &Env,
+    decimals: u32,
+) -> (Address, StellarAssetClient, TokenClient) {
     use soroban_sdk::token::{StellarAssetClient, TokenClient};
 
     let sac = env.register_stellar_asset_contract_v2(Address::generate(env));
@@ -1352,7 +1363,9 @@ pub struct MockFeeToken;
 impl MockFeeToken {
     pub fn init(env: Env, admin: Address, decimals: u32) {
         env.storage().persistent().set(&DataKey::Admin, &admin);
-        env.storage().persistent().set(&DataKey::Decimals, &decimals);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Decimals, &decimals);
     }
 
     pub fn transfer(env: Env, from: Address, to: Address, amount: i128) {
@@ -1366,7 +1379,10 @@ impl MockFeeToken {
     }
 
     pub fn decimals(env: Env) -> u32 {
-        env.storage().persistent().get(&DataKey::Decimals).unwrap_or(6)
+        env.storage()
+            .persistent()
+            .get(&DataKey::Decimals)
+            .unwrap_or(6)
     }
 }
 
@@ -1412,7 +1428,6 @@ fn test_fee_on_transfer_token_rejected() {
 
     client.fund(&investor, &target);
     panic!("Funding should have been rejected for fee-on-transfer token");
-
 }
 
 // ============================================================================
@@ -1535,7 +1550,7 @@ fn test_fund_with_commitment_tier_boundaries() {
         &env,
         &client,
         tier2_boundary - 1, // 179 days, 23h 59m 59s
-        1000, // Should still be Tier 1 (10%)
+        1000,               // Should still be Tier 1 (10%)
         "Just below Tier 2",
     );
 
@@ -1562,7 +1577,7 @@ fn test_fund_with_commitment_tier_boundaries() {
         &env,
         &client,
         tier3_boundary - 1, // 364 days, 23h 59m 59s
-        1200, // Should still be Tier 2 (12%)
+        1200,               // Should still be Tier 2 (12%)
         "Just below Tier 3",
     );
 
@@ -1651,7 +1666,10 @@ fn test_fund_maintains_consistent_funded_amount_state() {
     let amount1 = 100_000i128;
     client.fund(&investor1, &amount1);
     let escrow1 = client.get_escrow();
-    assert_eq!(escrow1.funded_amount, amount1, "funded_amount should be incremented after first fund");
+    assert_eq!(
+        escrow1.funded_amount, amount1,
+        "funded_amount should be incremented after first fund"
+    );
 
     // Second fund from another investor
     let investor2 = Address::generate(&env);
@@ -1659,8 +1677,8 @@ fn test_fund_maintains_consistent_funded_amount_state() {
     client.fund(&investor2, &amount2);
     let escrow2 = client.get_escrow();
     assert_eq!(
-        escrow2.funded_amount, 
-        amount1 + amount2, 
+        escrow2.funded_amount,
+        amount1 + amount2,
         "funded_amount should be cumulative after second fund"
     );
 
