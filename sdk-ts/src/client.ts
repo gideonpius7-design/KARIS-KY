@@ -23,6 +23,7 @@ import {
   type EscrowSnapshot,
   type ErrorDiagnostic,
   type EscrowTemplate,
+  type InvestorCapStatus,
   type InitParams,
   type SorobanResult,
   type EscrowEvent,
@@ -315,6 +316,14 @@ export class EscrowClient {
 
   async getContribution(investor: string): Promise<string> {
     return this.simulate("get_contribution", [investor]);
+  }
+
+  async computeInvestorPayout(investor: string): Promise<string> {
+    return this.simulate("compute_investor_payout", [investor]);
+  }
+
+  async getDistributedPrincipal(): Promise<string> {
+    return this.simulate("get_distributed_principal", []);
   }
 
   async getUniqueFunderCount(): Promise<number> {

@@ -183,6 +183,14 @@ export interface EscrowSnapshot {
   checksum: string;
 }
 
+/** Investor capacity snapshot returned by `get_investor_cap_status`. */
+export interface InvestorCapStatus {
+  max: number;
+  current: number;
+  remaining: number;
+  is_full: boolean;
+}
+
 /** Structured error diagnostic emitted alongside contract errors. */
 export interface ErrorDiagnostic {
   error_code: number;
