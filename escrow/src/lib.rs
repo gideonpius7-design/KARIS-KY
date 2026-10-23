@@ -416,6 +416,61 @@ pub const MAX_STATE_SNAPSHOTS: u32 = 16;
 /// Pending legal-hold proposals expire one hour after admin authorization.
 pub const LEGAL_HOLD_PROPOSAL_TTL_SECS: u64 = 3_600;
 
+/// Contract limit constants exposed via the [`LiquifactEscrow::get_limits`] getter.
+///
+/// This struct bundles all public limit constants that clients need to know to build valid
+/// transactions. Examples: [`MAX_FUND_BATCH`], attestation log capacity, dust sweep maximum,
+/// dispute pause maximum, etc.
+///
+/// Rationale: Clients hard-code these limits today. Exposing them via `get_limits()` allows
+/// SDKs and integrations to query them at runtime, reducing the risk of stale constants in
+/// deployed code. As limits evolve, contracts can update them without requiring all clients
+/// to rebuild.
+///
+/// Field order matches the order of constant definitions above to simplify auditing.
+#[contracttype]
+#[derive(Clone)]
+pub struct ContractLimits {
+    /// Upper bound on [`LiquifactEscrow::append_attestation_digest`] entries.
+    pub max_attestation_append_entries: u32,
+    /// Upper bound on reinvestment audit log entries.
+    pub max_reinvestment_audit_entries: u32,
+    /// Upper bound on [`DataKey::InvestorFundingHistory`] entries per investor.
+    pub max_investor_history_entries: u32,
+    /// Upper bound on [`DataKey::AdminRoles`] entries.
+    pub max_admin_roles: u32,
+    /// Upper bound on [`MultisigPolicy::signers`] entries.
+    pub max_multisig_signers: u32,
+    /// Upper bound on [`MultisigPolicy::operations`] entries.
+    pub max_multisig_operations: u32,
+    /// Upper bound on batch allowlist mutation entries per call.
+    pub max_investor_allowlist_batch: u32,
+    /// Upper bound on [`LiquifactEscrow::fund_batch`] entries per call.
+    pub max_fund_batch: u32,
+    /// Upper bound on [`LiquifactEscrow::batch_claim_investor_payouts`] entries per call.
+    pub max_batch_claim: u32,
+    /// Number of bucketing shards for investor contribution aggregates.
+    pub investor_bucket_count: u32,
+    /// Upper bound on [`LiquifactEscrow::sweep_terminal_dust`] per call (base units).
+    pub max_dust_sweep_amount: i128,
+    /// Maximum allowed dispute pause duration in seconds.
+    pub max_dispute_pause_duration_secs: u64,
+    /// Maximum UTF-8 byte length for the invoice `String` at init.
+    pub max_invoice_id_string_len: u32,
+    /// Minimum instance storage TTL extension horizon in ledgers.
+    pub instance_ttl_min_extension_ledgers: u32,
+    /// Minimum persistent storage TTL extension horizon in ledgers.
+    pub persistent_ttl_min_extension_ledgers: u32,
+    /// Upper bound on [`LiquifactEscrow::bump_ttl`]'s `allowlisted` entries per call.
+    pub max_ttl_bump_batch: u32,
+    /// Maximum UTF-8 byte length for a snapshot name.
+    pub max_snapshot_name_len: u32,
+    /// Upper bound on state snapshots to keep storage bounded.
+    pub max_state_snapshots: u32,
+    /// Pending legal-hold proposals expiration time in seconds.
+    pub legal_hold_proposal_ttl_secs: u64,
+}
+
 /// Stable typed errors emitted by karis-ky escrow entrypoints.
 ///
 /// Codes are append-only: never reuse or renumber a variant. Client SDKs should branch on the
@@ -2639,6 +2694,52 @@ impl LiquifactEscrow {
             build_timestamp: String::from_str(&env, BUILD_TIMESTAMP),
             pkg_version: String::from_str(&env, BUILD_PKG_VERSION),
             rust_version: String::from_str(&env, BUILD_RUST_VERSION),
+        }
+    }
+
+    /// Return all contract limit constants as a [`ContractLimits`] struct.
+    ///
+    /// Clients need to know limits such as [`MAX_FUND_BATCH`], attestation log capacity,
+    /// dust sweep maximum, and dispute pause maximum to build valid transactions without
+    /// hard-coding them. This getter exposes all public limit constants at runtime.
+    ///
+    /// The returned [`ContractLimits`] struct bundles every limit constant with a field
+    /// for each one, making it easy for SDKs and integration adapters to query limits
+    /// at contract initialization and adapt their transaction builders accordingly.
+    ///
+    /// # Authorization
+    ///
+    /// None — pure read; no auth required. Safe to call before `init` since all limits
+    /// are compile-time constants, not on-chain storage.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let limits = client.get_limits()?;
+    /// println!("Max fund batch: {}", limits.max_fund_batch);
+    /// println!("Max batch claim: {}", limits.max_batch_claim);
+    /// ```
+    pub fn get_limits(_env: Env) -> ContractLimits {
+        ContractLimits {
+            max_attestation_append_entries: MAX_ATTESTATION_APPEND_ENTRIES,
+            max_reinvestment_audit_entries: MAX_REINVESTMENT_AUDIT_ENTRIES,
+            max_investor_history_entries: MAX_INVESTOR_HISTORY_ENTRIES,
+            max_admin_roles: MAX_ADMIN_ROLES,
+            max_multisig_signers: MAX_MULTISIG_SIGNERS,
+            max_multisig_operations: MAX_MULTISIG_OPERATIONS,
+            max_investor_allowlist_batch: MAX_INVESTOR_ALLOWLIST_BATCH,
+            max_fund_batch: MAX_FUND_BATCH,
+            max_batch_claim: MAX_BATCH_CLAIM,
+            investor_bucket_count: INVESTOR_BUCKET_COUNT,
+            max_dust_sweep_amount: MAX_DUST_SWEEP_AMOUNT,
+            max_dispute_pause_duration_secs: MAX_DISPUTE_PAUSE_DURATION_SECS,
+            max_invoice_id_string_len: MAX_INVOICE_ID_STRING_LEN,
+            instance_ttl_min_extension_ledgers: INSTANCE_TTL_MIN_EXTENSION_LEDGERS,
+            persistent_ttl_min_extension_ledgers: PERSISTENT_TTL_MIN_EXTENSION_LEDGERS,
+            max_ttl_bump_batch: MAX_TTL_BUMP_BATCH,
+            max_snapshot_name_len: MAX_SNAPSHOT_NAME_LEN,
+            max_state_snapshots: MAX_STATE_SNAPSHOTS,
+            legal_hold_proposal_ttl_secs: LEGAL_HOLD_PROPOSAL_TTL_SECS,
         }
     }
 
